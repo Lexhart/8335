@@ -41,6 +41,20 @@ def make_checker(rule):
     def check(state):
         # This code is called by graph(state) and runs millions of times.
         # Tip: Do something with rule['Consumes'] and rule['Requires'].
+
+        if 'Consumes' in rule.keys():
+            for c_item, c_value in rule['Consumes'].items():
+                if c_item not in state.keys():
+                    return False
+                if state[c_item] < c_value:
+                    return False
+
+        if 'Requires' in rule.keys():
+                    for r_item, r_value in rule['Requires'].items():
+                        if r_item not in state.keys():
+                            return False
+                        if state[r_item] is None:
+                            return False
         return True
 
     return check
@@ -54,7 +68,22 @@ def make_effector(rule):
     def effect(state):
         # This code is called by graph(state) and runs millions of times
         # Tip: Do something with rule['Produces'] and rule['Consumes'].
-        next_state = None
+        next_state = state.copy()
+
+        if 'Consumes' in rule.keys():
+            for c_item, c_value in rule['Consumes'].items():
+                if c_item in next_state.keys():
+                    next_state[c_item] -= c_value
+                else:
+                    next_state[c_item] += c_value
+
+        if 'Produces' in rule.keys():
+            for p_item, p_value in rule['Produces'].items():
+                if p_item in next_state.keys():
+                    next_state[p_item] += p_value
+                else:
+                    next_state[p_item] = p_value
+
         return next_state
 
     return effect
@@ -66,7 +95,11 @@ def make_goal_checker(goal):
 
     def is_goal(state):
         # This code is used in the search process and may be called millions of times.
-        return False
+        for g_item, g_value in goal.items():
+            if g_item in goal:
+                if state[g_item] < g_value:
+                     return False
+        return True
 
     return is_goal
 
