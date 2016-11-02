@@ -1,7 +1,7 @@
 import json
 from collections import namedtuple, defaultdict, OrderedDict
 from timeit import default_timer as time
-from math import inf
+from math import inf, ceil
 from heapq import heappush,heappop
 
 Recipe = namedtuple('Recipe', ['name', 'check', 'effect', 'cost'])
@@ -25,6 +25,13 @@ class State(OrderedDict):
 
     def __lt__(self, other):
         return self.__key() < other.__key()
+
+    def __gt__(self, other):
+        return self.__key() > other.__key()
+
+
+    def __ne__(self, other):
+        return not (self == other)
 
     def copy(self):
         new_state = State()
@@ -61,6 +68,47 @@ def make_checker(rule):
 
     return check
 
+def make_checker_for_heur(rule):
+    # Implement a function that returns a function to determine whether a state meets a
+    # rule's requirements. This code runs once, when the rules are constructed before
+    # the search is attempted.
+
+    def check(state):
+        # This code is called by graph(state) and runs millions of times.
+        # Tip: Do something with rule['Consumes'] and rule['Requires'].
+        if 'Produces' in rule.keys():
+            for p_item, p_value in rule['Produces'].items():
+                if p_item not in state.keys():
+                    return False
+                if state[p_item] <= 0:
+                    return False
+
+        return True
+
+    return check
+
+def make_rev_effector(rule):
+    # Implement a function that returns a function which transitions from state to
+    # new_state given the rule. This code runs once, when the rules are constructed
+    # before the search is attempted.
+
+    def effect(state):
+        # This code is called by graph(state) and runs millions of times
+        # Tip: Do something with rule['Produces'] and rule['Consumes'].
+
+        if 'Consumes' in rule.keys():
+            for c_item, c_value in rule['Consumes'].items():
+                if c_item in state.keys():
+                    state[c_item] += c_value
+                else:
+                    state[c_item] = c_value
+
+        if 'Produces' in rule.keys():
+            for p_item, p_value in rule['Produces'].items():
+                state[p_item] -= p_value
+        return state
+
+    return effect
 
 def make_effector(rule):
     # Implement a function that returns a function which transitions from state to
@@ -76,8 +124,7 @@ def make_effector(rule):
             for c_item, c_value in rule['Consumes'].items():
                 if c_item in next_state.keys():
                     next_state[c_item] -= c_value
-                else:
-                    next_state[c_item] += c_value
+
 
         if 'Produces' in rule.keys():
             for p_item, p_value in rule['Produces'].items():
@@ -123,20 +170,57 @@ def get_missing(currentState, targetState):
             targetState[t_item] -= currentState[t_item]
     return targetState
 
+def heur(state):
+    for s_item, s_value in state.items():
+        if (s_item=="bench" or s_item== "furnace" or s_item== "iron_axe" or s_item == "iron_pickaxe" or \
+                        s_item=="stone_axe" or s_item=="stone_pickaxe" or s_item=="wooden_axe"  \
+                        or s_item=="wooden_pickaxe") and s_value>=2:
+            return inf
+    return 0
 def heuristic(state):
     # Implement your heuristic here!
+
     if is_goal(state):
         return 0
     for s_item, s_value in state.items():
         if (s_item=="bench" or s_item== "furnace" or s_item== "iron_axe" or s_item == "iron_pickaxe" or \
                         s_item=="stone_axe" or s_item=="stone_pickaxe" or s_item=="wooden_axe"  \
-                        or s_item=="wooden_pickaxe") and s_value>1:
+                        or s_item=="wooden_pickaxe") and s_value>=2:
             return inf
     goal_state = State({key: 0 for key in Crafting['Items']})
     goal_state.update(Crafting['Goal'])
+    diffState=get_missing(state,goal_state)
+    heur=0
+    while True:
+        break_check=True
+        for d_item, d_value in diffState.items():
+            if d_value>0:
+                break_check=False
+                rule, p_number, rule_time = fastest_rule(d_item)
+                heur_efector = make_rev_effector(rule)
+                for i in range(ceil(1.0*d_value/p_number)):
+                    heur_efector(diffState)
+                    heur+=rule_time
+        if break_check:
+            break
+    #print('heur for this node is :',heur)
 
     return 0
 
+def fastest_rule(item):
+    ret_rule=None
+    rule_time=inf
+    rule_value=0
+    for name, rule in Crafting['Recipes'].items():
+        for p_item, p_value in rule['Produces'].items():
+            if p_item==item:
+                if rule['Time']<rule_time:
+                    rule_time=rule['Time']
+                    ret_rule=rule
+                    rule_value=p_value
+    return (ret_rule,rule_value,rule_time)
+compute_time=0
+game_time=0
 def search(graph, state, is_goal, limit, heuristic):
 
     start_time = time()
@@ -148,18 +232,35 @@ def search(graph, state, is_goal, limit, heuristic):
 
     #while time() - start_time < limit:
     #    pass
+
     Q=[]
-    action=None
     heappush(Q,(0,state))
     #for i in range(10):
-    while Q:
-        prev_t, state = heappop(Q)
-        print("time: ",prev_t, "heap size: ", len(Q))
-        if is_goal(state):
-            print("Olala", prev_t)
-            break
-        for action, next_state, t in graph(state):
-            heappush(Q,(t + prev_t +  heuristic(next_state), next_state))
+    came_from_and_action = {}
+    costs_so_far = {state:0}
+    came_from_and_action[state]=(0,0)
+
+    while Q and time() - start_time < limit:
+        score , current_state = heappop(Q)
+
+        #print(costs_so_far[current_state])
+        if is_goal(current_state):
+            global game_time
+            game_time = costs_so_far[current_state]
+            global compute_time
+            compute_time= time()-start_time
+            while(came_from_and_action[current_state] != (0,0)):
+                came_from, action = came_from_and_action[current_state]
+                yield (current_state, action)
+                current_state=came_from
+            return
+        for action, next_state, t in graph(current_state):
+            new_cost=costs_so_far[current_state]+t
+            if next_state not in costs_so_far or new_cost<costs_so_far[next_state]:
+                heappush(Q, (new_cost+ heur(next_state), next_state))
+                came_from_and_action[next_state]=(current_state,action)
+                costs_so_far[next_state]=new_cost
+
     # Failed to find a path
 
     print(time() - start_time, 'seconds.')
@@ -184,18 +285,16 @@ if __name__ == '__main__':
 
     # Build rules
     all_recipes = []
+    all_heur_recipes = []
 
-    '''
-    for name, rule in Crafting['Recipes'].items():
-        print('name: ', name)
-        print('rule: ',rule)
-    '''
 
     for name, rule in Crafting['Recipes'].items():
         checker = make_checker(rule)
         effector = make_effector(rule)
         recipe = Recipe(name, checker, effector, rule['Time'])
         all_recipes.append(recipe)
+        heur_checker = make_checker_for_heur(rule)
+
 
 
     # Create a function which checks for the goal
@@ -207,10 +306,14 @@ if __name__ == '__main__':
     state.update(Crafting['Initial'])
 
     # Search for a solution
+
     resulting_plan = search(graph, state, is_goal, 30, heuristic)
 
     if resulting_plan:
         # Print resulting plan
+
         for state, action in resulting_plan:
             print('\t',state)
             print(action)
+        print('game time: ' + str(game_time))
+        print('compute time: ', str(compute_time))
