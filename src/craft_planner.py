@@ -55,7 +55,7 @@ def make_checker(rule):
             for r_item, r_value in rule['Requires'].items():
                 if r_item not in state.keys():
                     return False
-                if state[r_item] is None:
+                if state[r_item] ==0:
                     return False
         return True
 
@@ -116,9 +116,23 @@ def graph(state):
         if r.check(state):
             yield (r.name, r.effect(state), r.cost)
 
+def get_missing(currentState, targetState):
+    for t_item, t_value in targetState.items():
+        #diffState[t_item]= -t_value
+        if t_item in currentState:
+            targetState[t_item] -= currentState[t_item]
+    return targetState
 
 def heuristic(state):
     # Implement your heuristic here!
+    if is_goal(state):
+        return 0
+    for s_item, s_value in state.items():
+        if (s_item=="bench" or s_item== "furnace" or s_item== "iron_axe" or s_item == "iron_pickaxe" or \
+                        s_item=="stone_axe" or s_item=="stone_pickaxe" or s_item=="wooden_axe"  \
+                        or s_item=="wooden_pickaxe") and s_value>1:
+            return inf
+  
     return 0
 
 def search(graph, state, is_goal, limit, heuristic):
@@ -129,10 +143,23 @@ def search(graph, state, is_goal, limit, heuristic):
     # When you find a path to the goal return a list of tuples [(state, action)]
     # representing the path. Each element (tuple) of the list represents a state
     # in the path and the action that took you to this state
-    while time() - start_time < limit:
-        pass
 
+    #while time() - start_time < limit:
+    #    pass
+    Q=[]
+    action=None
+    heappush(Q,(0,state))
+    #while Q:
+    for i in range(10):
+        prev_t, state = heappop(Q)
+        print("time: ",prev_t, "heap size: ", len(Q))
+        if is_goal(state):
+            print("Olala", prev_t)
+            break
+        for action, next_state, t in graph(state):
+            heappush(Q,(t + prev_t +  heuristic(next_state), next_state))
     # Failed to find a path
+
     print(time() - start_time, 'seconds.')
     print("Failed to find a path from", state, 'within time limit.')
     return None
@@ -151,14 +178,16 @@ if __name__ == '__main__':
     print('Goal:',Crafting['Goal'])
 
     # Dict of crafting recipes (each is a dict):
-    print('Example recipe:','craft stone_pickaxe at bench ->',Crafting['Recipes']['craft stone_pickaxe at bench'])
+    #print('Example recipe:','craft stone_pickaxe at bench ->',Crafting['Recipes']['craft stone_pickaxe at bench'])
 
     # Build rules
     all_recipes = []
 
+    '''
     for name, rule in Crafting['Recipes'].items():
         print('name: ', name)
         print('rule: ',rule)
+    '''
 
     for name, rule in Crafting['Recipes'].items():
         checker = make_checker(rule)
