@@ -1,6 +1,8 @@
 import json
 from collections import namedtuple, defaultdict, OrderedDict
 from timeit import default_timer as time
+from math import inf
+from heapq import heappush,heappop
 
 Recipe = namedtuple('Recipe', ['name', 'check', 'effect', 'cost'])
 
@@ -50,11 +52,11 @@ def make_checker(rule):
                     return False
 
         if 'Requires' in rule.keys():
-                    for r_item, r_value in rule['Requires'].items():
-                        if r_item not in state.keys():
-                            return False
-                        if state[r_item] is None:
-                            return False
+            for r_item, r_value in rule['Requires'].items():
+                if r_item not in state.keys():
+                    return False
+                if state[r_item] is None:
+                    return False
         return True
 
     return check
@@ -96,9 +98,11 @@ def make_goal_checker(goal):
     def is_goal(state):
         # This code is used in the search process and may be called millions of times.
         for g_item, g_value in goal.items():
-            if g_item in goal:
+            if g_item in state.keys():
                 if state[g_item] < g_value:
                      return False
+            else:
+                return False
         return True
 
     return is_goal
@@ -134,14 +138,14 @@ def search(graph, state, is_goal, limit, heuristic):
     return None
 
 if __name__ == '__main__':
-    with open('Crafting.json') as f:
+    with open('crafting.json') as f:
         Crafting = json.load(f)
 
     # List of items that can be in your inventory:
     print('All items:', Crafting['Items'])
 
     # List of items in your initial inventory with amounts:
-    print('Initial inventory:', Crafting['Initial'])
+    #print('Recipes:', Crafting['Recipes'][0])
 
     # List of items needed to be in your inventory at the end of the plan:
     print('Goal:',Crafting['Goal'])
@@ -151,14 +155,21 @@ if __name__ == '__main__':
 
     # Build rules
     all_recipes = []
+
+    for name, rule in Crafting['Recipes'].items():
+        print('name: ', name)
+        print('rule: ',rule)
+
     for name, rule in Crafting['Recipes'].items():
         checker = make_checker(rule)
         effector = make_effector(rule)
         recipe = Recipe(name, checker, effector, rule['Time'])
         all_recipes.append(recipe)
 
+
     # Create a function which checks for the goal
     is_goal = make_goal_checker(Crafting['Goal'])
+
 
     # Initialize first state from initial inventory
     state = State({key: 0 for key in Crafting['Items']})
