@@ -132,7 +132,9 @@ def heuristic(state):
                         s_item=="stone_axe" or s_item=="stone_pickaxe" or s_item=="wooden_axe"  \
                         or s_item=="wooden_pickaxe") and s_value>1:
             return inf
-  
+    goal_state = State({key: 0 for key in Crafting['Items']})
+    goal_state.update(Crafting['Goal'])
+
     return 0
 
 def search(graph, state, is_goal, limit, heuristic):
@@ -149,8 +151,8 @@ def search(graph, state, is_goal, limit, heuristic):
     Q=[]
     action=None
     heappush(Q,(0,state))
-    #while Q:
-    for i in range(10):
+    #for i in range(10):
+    while Q:
         prev_t, state = heappop(Q)
         print("time: ",prev_t, "heap size: ", len(Q))
         if is_goal(state):
