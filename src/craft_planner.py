@@ -205,7 +205,7 @@ def heuristic(state):
             break
     #print('heur for this node is :',heur)
 
-    return 0
+    return heur
 
 def fastest_rule(item):
     ret_rule=None
@@ -239,25 +239,36 @@ def search(graph, state, is_goal, limit, heuristic):
     came_from_and_action = {}
     costs_so_far = {state:0}
     came_from_and_action[state]=(0,0)
-
+    #for i in range(3):
     while Q and time() - start_time < limit:
         score , current_state = heappop(Q)
 
-        #print(costs_so_far[current_state])
+        #print('min game time:',score )
         if is_goal(current_state):
             global game_time
             game_time = costs_so_far[current_state]
             global compute_time
             compute_time= time()-start_time
+            return_list=[]
             while(came_from_and_action[current_state] != (0,0)):
                 came_from, action = came_from_and_action[current_state]
-                yield (current_state, action)
+                #print(current_state, ' ', action)
+                return_list.append ((current_state, action))
                 current_state=came_from
-            return
+
+            return reversed(return_list)
+        '''
+        for x,y in costs_so_far.items():
+            print('x: ',x)
+            print('y: ', y)
+        '''
         for action, next_state, t in graph(current_state):
             new_cost=costs_so_far[current_state]+t
+
             if next_state not in costs_so_far or new_cost<costs_so_far[next_state]:
-                heappush(Q, (new_cost+ heur(next_state), next_state))
+                #h=heuristic(next_state)
+
+                heappush(Q, (new_cost+ heuristic(next_state), next_state))
                 came_from_and_action[next_state]=(current_state,action)
                 costs_so_far[next_state]=new_cost
 
@@ -279,6 +290,7 @@ if __name__ == '__main__':
 
     # List of items needed to be in your inventory at the end of the plan:
     print('Goal:',Crafting['Goal'])
+    print('Initial: ',Crafting['Initial'])
 
     # Dict of crafting recipes (each is a dict):
     #print('Example recipe:','craft stone_pickaxe at bench ->',Crafting['Recipes']['craft stone_pickaxe at bench'])
@@ -311,9 +323,12 @@ if __name__ == '__main__':
 
     if resulting_plan:
         # Print resulting plan
-
+        leng=0
         for state, action in resulting_plan:
             print('\t',state)
             print(action)
+            leng+=1
         print('game time: ' + str(game_time))
+        print('game length: ',leng)
         print('compute time: ', str(compute_time))
+
